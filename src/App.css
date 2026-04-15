@@ -244,6 +244,19 @@ body {
 .playback-seek {
   width: 100%;
   max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.time-row {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--dim);
+  font-weight: 500;
 }
 
 .player-controls-main {
