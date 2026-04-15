@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VibeSync — Emotion-Adaptive Spotify</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #1DB954;
+    --green-dim: rgba(29,185,84,0.15);
+    --green-glow: rgba(29,185,84,0.4);
+    --bg: #0a0a0f;
+    --bg2: #111118;
+    --bg3: #181824;
+    --border: rgba(255,255,255,0.08);
+    --border-h: rgba(255,255,255,0.15);
+    --text: #f0f0f5;
+    --muted: #888896;
+    --dim: #555568;
+    --blue: #4a9eff;
+    --coral: #ff6b6b;
+    --amber: #ffb347;
+    --purple: #b47aff;
+    --radius: 12px;
+    --radius-lg: 18px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .noise {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 0; opacity: 0.4;
+  }
+
+  .app-wrap {
+    position: relative; z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 20px;
+  }
+
+  /* HEADER */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 28px;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-icon {
+    width: 34px; height: 34px;
+    background: var(--green);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .logo-icon::after {
+    content: '';
+    position: absolute;
+    width: 100%; height: 100%;
+    background: radial-gradient(circle at 40% 40%, rgba(255,255,255,0.3), transparent 60%);
+  }
+  .logo-waves {
+    display: flex; align-items: center; gap: 2px;
+  }
+  .logo-waves span {
+    display: block; width: 3px; background: #0a3d1a;
+    border-radius: 2px;
+    animation: wave 1.2s ease-in-out infinite;
+  }
+  .logo-waves span:nth-child(1) { height: 8px; animation-delay: 0s; }
+  .logo-waves span:nth-child(2) { height: 14px; animation-delay: 0.15s; }
+  .logo-waves span:nth-child(3) { height: 10px; animation-delay: 0.3s; }
+  .logo-waves span:nth-child(4) { height: 16px; animation-delay: 0.1s; }
+  .logo-waves span:nth-child(5) { height: 8px; animation-delay: 0.25s; }
+  @keyframes wave {
+    0%, 100% { transform: scaleY(1); }
+    50% { transform: scaleY(0.5); }
+  }
+  .logo-text {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800; font-size: 22px;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+  .logo-text span { color: var(--green); }
+
+  .header-badge {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 6px 14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .live-dot {
+    width: 7px; height: 7px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.8); }
+  }
+
+  /* MAIN GRID */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .card-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; font-weight: 500;
+    color: var(--dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .card-body { padding: 18px; }
+
+  /* WEBCAM PANEL */
+  .cam-container {
+    position: relative;
+    background: #05050a;
+    border-radius: var(--radius);
+    overflow: hidden;
+    aspect-ratio: 4/3;
+  }
+  #camCanvas { width: 100%; height: 100%; display: block; }
+
+  .cam-overlay-top {
+    position: absolute; top: 10px; left: 10px; right: 10px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    pointer-events: none;
+  }
+  .cam-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    background: rgba(0,0,0,0.7);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: var(--muted);
+    backdrop-filter: blur(4px);
+  }
+  .cam-badge.rec {
+    color: var(--coral);
+    border-color: rgba(255,107,107,0.3);
+  }
+  .rec-dot {
+    display: inline-block; width: 5px; height: 5px;
+    background: var(--coral); border-radius: 50%;
+    margin-right: 4px;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  .cam-overlay-bottom {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    padding: 10px;
+    background: linear-gradient(transparent, rgba(5,5,10,0.9));
+  }
+  .emotion-bar-container {
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .emotion-row {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .emotion-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    min-width: 48px;
+  }
+  .emotion-track {
+    flex: 1;
+    height: 3px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .emotion-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+  }
+  .emotion-pct {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--dim);
+    min-width: 28px;
+    text-align: right;
+  }
+
+  /* EMOTION STATE */
+  .mood-display {
+    display: flex; flex-direction: column; gap: 16px;
+    padding: 18px;
+  }
+  .current-mood {
+    display: flex; align-items: center; gap: 16px;
+    padding: 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--bg3);
+    transition: all 0.6s ease;
+  }
+  .mood-icon-wrap {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px;
+    flex-shrink: 0;
+    transition: all 0.6s ease;
+  }
+  .mood-info h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px; font-weight: 700;
+    line-height: 1;
+    transition: color 0.6s ease;
+  }
+  .mood-info p {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    font-family: 'DM Mono', monospace;
+  }
+  .confidence-wrap {
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .confidence-label {
+    display: flex; justify-content: space-between;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; color: var(--dim);
+  }
+  .confidence-track {
+    height: 5px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .confidence-fill {
+    height: 100%;
+    background: var(--green);
+    border-radius: 4px;
+    transition: width 1s ease;
+  }
+
+  /* DELAY TIMER */
+  .delay-section {
+    padding: 14px 18px;
+    border-top: 1px solid var(--border);
+  }
+  .delay-label {
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; color: var(--dim);
+    margin-bottom: 8px;
+  }
+  .delay-label span { color: var(--muted); }
+  .delay-track {
+    height: 6px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .delay-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 1s linear, background 0.6s ease;
+    width: 0%;
+  }
+  .delay-status {
+    margin-top: 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--dim);
+    text-align: right;
+  }
+
+  /* SPOTIFY PLAYER */
+  .player-section { padding: 18px; }
+  .now-playing-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; color: var(--dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .spotify-icon {
+    width: 14px; height: 14px;
+    background: var(--green);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .track-card {
+    display: flex; gap: 14px; align-items: center;
+    padding: 12px;
+    background: var(--bg3);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    margin-bottom: 14px;
+    transition: all 0.5s ease;
+  }
+  .track-art {
+    width: 52px; height: 52px;
+    border-radius: 8px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    transition: background 0.6s ease;
+  }
+  .track-info { flex: 1; min-width: 0; }
+  .track-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    transition: color 0.4s ease;
+  }
+  .track-artist {
+    font-size: 12px; color: var(--muted);
+    margin-top: 2px;
+  }
+  .track-bpm {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    padding: 3px 8px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    color: var(--dim);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Progress bar */
+  .progress-wrap { margin-bottom: 10px; }
+  .progress-track {
+    height: 3px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--green);
+    border-radius: 2px;
+    animation: progress 30s linear infinite;
+  }
+  @keyframes progress {
+    from { width: 0%; }
+    to { width: 100%; }
+  }
+  .progress-times {
+    display: flex; justify-content: space-between;
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; color: var(--dim);
+    margin-top: 5px;
+  }
+
+  .player-controls {
+    display: flex; align-items: center; justify-content: center; gap: 20px;
+  }
+  .ctrl-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--muted); padding: 6px;
+    border-radius: 50%;
+    transition: color 0.2s, background 0.2s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ctrl-btn:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+  .ctrl-btn.play {
+    width: 38px; height: 38px;
+    background: var(--text); color: var(--bg);
+    border-radius: 50%;
+  }
+  .ctrl-btn.play:hover { background: var(--green); color: #0a3d1a; }
+
+  /* QUEUE */
+  .queue-section {
+    padding: 0 18px 16px;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+  .queue-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; color: var(--dim);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 10px;
+  }
+  .queue-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: opacity 0.5s ease;
+  }
+  .queue-item:last-child { border-bottom: none; }
+  .queue-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; color: var(--dim);
+    min-width: 14px;
+  }
+  .queue-art {
+    width: 30px; height: 30px;
+    border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .queue-info { flex: 1; min-width: 0; }
+  .queue-name {
+    font-size: 12px; font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .queue-artist { font-size: 10px; color: var(--dim); }
+  .queue-bpm {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; color: var(--dim);
+  }
+
+  /* PIPELINE */
+  .pipeline-section {
+    padding: 18px;
+  }
+  .pipeline {
+    display: flex; align-items: center; gap: 0;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .pipe-step {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 6px;
+    flex-shrink: 0;
+    min-width: 90px;
+  }
+  .pipe-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    transition: border-color 0.4s, background 0.4s;
+    position: relative;
+  }
+  .pipe-icon.active {
+    border-color: var(--green);
+    background: var(--green-dim);
+    animation: pipe-glow 1.5s ease-in-out infinite;
+  }
+  @keyframes pipe-glow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(29,185,84,0.3); }
+    50% { box-shadow: 0 0 0 6px rgba(29,185,84,0); }
+  }
+  .pipe-name {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; color: var(--dim);
+    text-align: center;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    line-height: 1.3;
+  }
+  .pipe-arrow {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+    min-width: 20px;
+    position: relative;
+    margin-bottom: 22px;
+    align-self: center;
+  }
+  .pipe-arrow::after {
+    content: '';
+    position: absolute; right: -4px; top: -3px;
+    width: 0; height: 0;
+    border-top: 3.5px solid transparent;
+    border-bottom: 3.5px solid transparent;
+    border-left: 5px solid var(--border);
+  }
+  .pipe-arrow.active {
+    background: var(--green);
+    animation: flow 1.5s linear infinite;
+  }
+  .pipe-arrow.active::after { border-left-color: var(--green); }
+  @keyframes flow {
+    0% { opacity: 0.4; }
+    50% { opacity: 1; }
+    100% { opacity: 0.4; }
+  }
+
+  /* DEMO CONTROLS */
+  .demo-section {
+    padding: 16px 18px;
+    border-top: 1px solid var(--border);
+  }
+  .demo-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; color: var(--dim);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 10px;
+  }
+  .demo-btns {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .demo-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 14px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    background: var(--bg3);
+    color: var(--muted);
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    transition: all 0.2s ease;
+  }
+  .demo-btn:hover {
+    border-color: var(--border-h);
+    color: var(--text);
+    background: rgba(255,255,255,0.04);
+  }
+  .demo-btn.active {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  /* TOAST */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--bg3);
+    border: 1px solid var(--border-h);
+    border-radius: 100px;
+    padding: 10px 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text);
+    opacity: 0;
+    transition: all 0.3s ease;
+    pointer-events: none;
+    z-index: 100;
+    white-space: nowrap;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* Bottom row */
+  .bottom-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .stat-row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px; padding: 14px 18px;
+  }
+  .stat-cell {
+    background: var(--bg3);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+  }
+  .stat-val {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px; font-weight: 700;
+    transition: color 0.5s ease;
+  }
+  .stat-lbl {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 2px;
+  }
+
+  @media (max-width: 700px) {
+    .main-grid, .bottom-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="noise"></div>
+<div class="app-wrap">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">
+        <div class="logo-waves">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+      <div class="logo-text">Vibe<span>Sync</span></div>
+    </div>
+    <div class="header-badge">
+      <div class="live-dot"></div>
+      <span>NULOOK — JIIT NOIDA</span>
+    </div>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div class="main-grid">
+
+    <!-- LEFT: WEBCAM + EMOTION DETECTION -->
+    <div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Vision Engine</div>
+          <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--green);">DeepFace · Local</div>
+        </div>
+        <div class="card-body" style="padding:12px;">
+          <div class="cam-container">
+            <canvas id="camCanvas" width="400" height="300"></canvas>
+            <div class="cam-overlay-top">
+              <div class="cam-badge rec"><span class="rec-dot"></span>LIVE</div>
+              <div class="cam-badge" id="fpsLabel">30 fps</div>
+            </div>
+            <div class="cam-overlay-bottom">
+              <div class="emotion-bar-container" id="emotionBars"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats row -->
+        <div class="stat-row">
+          <div class="stat-cell">
+            <div class="stat-val" id="statConf" style="color:var(--green);">91%</div>
+            <div class="stat-lbl">Confidence</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-val" id="statFrames">1.2k</div>
+            <div class="stat-lbl">Frames</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-val" id="statLatency" style="color:var(--amber);">18ms</div>
+            <div class="stat-lbl">Latency</div>
+          </div>
+        </div>
+
+        <!-- Delay Timer -->
+        <div class="delay-section">
+          <div class="delay-label">
+            <span>MOOD LOCK TIMER</span>
+            <span id="delayTime">0s / 30s</span>
+          </div>
+          <div class="delay-track">
+            <div class="delay-fill" id="delayFill"></div>
+          </div>
+          <div class="delay-status" id="delayStatus">Waiting for stable mood signal...</div>
+        </div>
+
+        <!-- Demo Controls -->
+        <div class="demo-section">
+          <div class="demo-label">Simulate Mood →</div>
+          <div class="demo-btns">
+            <button class="demo-btn" data-mood="focused" onclick="setMood('focused')">
+              <span>🎯</span> Focused
+            </button>
+            <button class="demo-btn" data-mood="stressed" onclick="setMood('stressed')">
+              <span>😤</span> Stressed
+            </button>
+            <button class="demo-btn" data-mood="sad" onclick="setMood('sad')">
+              <span>😔</span> Sad
+            </button>
+            <button class="demo-btn" data-mood="happy" onclick="setMood('happy')">
+              <span>😄</span> Happy
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: MOOD STATE + PLAYER -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+
+      <!-- Mood State Card -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Current State</div>
+          <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);" id="moodAction">Monitoring...</div>
+        </div>
+        <div class="mood-display">
+          <div class="current-mood" id="moodCard">
+            <div class="mood-icon-wrap" id="moodIcon">😐</div>
+            <div class="mood-info">
+              <h2 id="moodName">Neutral</h2>
+              <p id="moodDesc">Baseline detected — tracking</p>
+            </div>
+          </div>
+          <div class="confidence-wrap">
+            <div class="confidence-label">
+              <span>Detection Confidence</span>
+              <span id="confPct">71%</span>
+            </div>
+            <div class="confidence-track">
+              <div class="confidence-fill" id="confFill" style="width:71%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Spotify Player -->
+      <div class="card" style="flex:1;">
+        <div class="card-header">
+          <div class="card-title">Spotify Control</div>
+          <div style="display:flex;align-items:center;gap:5px;font-family:'DM Mono',monospace;font-size:9px;color:var(--green);">
+            <div style="width:6px;height:6px;background:var(--green);border-radius:50%;animation:pulse 2s infinite;"></div>
+            Connected
+          </div>
+        </div>
+        <div class="player-section">
+          <div class="now-playing-label">
+            <div class="spotify-icon">
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                <path d="M1 5.5C2.5 4.5 5.5 4.5 7 5.5M1.5 3.5C3.2 2.3 4.8 2.3 6.5 3.5M2.2 1.5C3.5 0.7 4.5 0.7 5.8 1.5" stroke="#0a3d1a" stroke-width="1.2" stroke-linecap="round"/>
+              </svg>
+            </div>
+            now playing
+          </div>
+          <div class="track-card" id="trackCard">
+            <div class="track-art" id="trackArt">🎵</div>
+            <div class="track-info">
+              <div class="track-name" id="trackName">Weightless</div>
+              <div class="track-artist" id="trackArtist">Marconi Union</div>
+            </div>
+            <div class="track-bpm" id="trackBpm">60 BPM</div>
+          </div>
+
+          <div class="progress-wrap">
+            <div class="progress-track">
+              <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-times">
+              <span id="progCurrent">1:23</span>
+              <span id="progTotal">8:08</span>
+            </div>
+          </div>
+
+          <div class="player-controls">
+            <button class="ctrl-btn" title="Shuffle">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+            </button>
+            <button class="ctrl-btn" title="Previous">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+            </button>
+            <button class="ctrl-btn play" title="Play/Pause" id="playBtn" onclick="togglePlay()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" id="playIcon"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+            <button class="ctrl-btn" title="Next">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+            </button>
+            <button class="ctrl-btn" title="Repeat">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="queue-section">
+          <div class="queue-title">Up Next — Mood Queue</div>
+          <div id="queueList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM ROW -->
+  <div class="bottom-row">
+    <!-- Pipeline -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">System Pipeline</div>
+        <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);">Bun · TypeScript · Python</div>
+      </div>
+      <div class="pipeline-section">
+        <div class="pipeline" id="pipeline">
+          <div class="pipe-step">
+            <div class="pipe-icon active" id="pipe0">📷</div>
+            <div class="pipe-name">Webcam<br>Input</div>
+          </div>
+          <div class="pipe-arrow" id="arr0"></div>
+          <div class="pipe-step">
+            <div class="pipe-icon" id="pipe1">🧠</div>
+            <div class="pipe-name">DeepFace<br>Model</div>
+          </div>
+          <div class="pipe-arrow" id="arr1"></div>
+          <div class="pipe-step">
+            <div class="pipe-icon" id="pipe2">⏱</div>
+            <div class="pipe-name">Smart<br>Delay</div>
+          </div>
+          <div class="pipe-arrow" id="arr2"></div>
+          <div class="pipe-step">
+            <div class="pipe-icon" id="pipe3">🔗</div>
+            <div class="pipe-name">TS<br>Bridge</div>
+          </div>
+          <div class="pipe-arrow" id="arr3"></div>
+          <div class="pipe-step">
+            <div class="pipe-icon" id="pipe4">🎵</div>
+            <div class="pipe-name">Spotify<br>API</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mood History Log -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Event Log</div>
+        <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--dim);" id="logCount">0 events</div>
+      </div>
+      <div style="padding:12px 18px;max-height:160px;overflow-y:auto;" id="eventLog">
+        <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--dim);padding:8px 0;">Waiting for events...</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const MOODS = {
+  focused: {
+    name: 'Focused',
+    icon: '🎯',
+    desc: 'Locking vibe — no track switches',
+    color: 'var(--blue)',
+    bg: 'rgba(74,158,255,0.12)',
+    action: 'Queue locked — stable vibe',
+    conf: 88,
+    emotions: { focused: 78, neutral: 15, happy: 5, stressed: 2 },
+    tracks: [
+      { name: 'lo-fi study beats', artist: 'ChilledCow', bpm: 80, art: '📻' },
+      { name: 'Brain Food', artist: 'Study Playlist', bpm: 85, art: '🧠' },
+      { name: 'Deep Focus', artist: 'Spotify', bpm: 78, art: '🔵' },
+    ],
+    queueColor: 'rgba(74,158,255,0.08)',
+  },
+  stressed: {
+    name: 'Stressed',
+    icon: '😤',
+    desc: 'Detected tension — calming queue',
+    color: 'var(--coral)',
+    bg: 'rgba(255,107,107,0.12)',
+    action: 'Shifting to low-BPM tracks',
+    conf: 91,
+    emotions: { stressed: 72, focused: 18, neutral: 7, happy: 3 },
+    tracks: [
+      { name: 'Weightless', artist: 'Marconi Union', bpm: 60, art: '🌊' },
+      { name: 'Clair de lune', artist: 'Debussy', bpm: 54, art: '🌙' },
+      { name: 'Calm Radio', artist: 'Ambient Mix', bpm: 58, art: '🍃' },
+    ],
+    queueColor: 'rgba(255,107,107,0.08)',
+  },
+  sad: {
+    name: 'Sad',
+    icon: '😔',
+    desc: 'Mood dip — playing mood-lifters',
+    color: 'var(--purple)',
+    bg: 'rgba(180,122,255,0.12)',
+    action: 'Loading personal cheer-ups',
+    conf: 84,
+    emotions: { sad: 68, neutral: 20, stressed: 8, happy: 4 },
+    tracks: [
+      { name: 'Happy', artist: 'Pharrell Williams', bpm: 160, art: '☀️' },
+      { name: 'Good as Hell', artist: 'Lizzo', bpm: 96, art: '💛' },
+      { name: 'Walking on Sunshine', artist: 'Katrina & The Waves', bpm: 132, art: '🌞' },
+    ],
+    queueColor: 'rgba(180,122,255,0.08)',
+  },
+  happy: {
+    name: 'Happy',
+    icon: '😄',
+    desc: 'Positive affect — riding the wave',
+    color: 'var(--green)',
+    bg: 'var(--green-dim)',
+    action: 'High-energy queue loaded',
+    conf: 95,
+    emotions: { happy: 82, focused: 10, neutral: 6, stressed: 2 },
+    tracks: [
+      { name: 'Blinding Lights', artist: 'The Weeknd', bpm: 171, art: '🔴' },
+      { name: 'Levitating', artist: 'Dua Lipa', bpm: 103, art: '✨' },
+      { name: 'Dynamite', artist: 'BTS', bpm: 114, art: '💥' },
+    ],
+    queueColor: 'rgba(29,185,84,0.08)',
+  },
+};
+
+let currentMood = null;
+let delayInterval = null;
+let delayProgress = 0;
+let isPlaying = false;
+let frameCount = 0;
+let logEvents = [];
+let animFrame;
+let pipeStep = 0;
+
+// Canvas Face Animation
+const canvas = document.getElementById('camCanvas');
+const ctx = canvas.getContext('2d');
+
+const face = {
+  cx: 200, cy: 130, rx: 55, ry: 68,
+  pts: [],
+};
+
+function buildFacePts() {
+  face.pts = [];
+  const angles = [0,30,60,90,120,150,180,210,240,270,300,330];
+  angles.forEach(a => {
+    const r = a * Math.PI / 180;
+    face.pts.push({ x: face.cx + face.rx * Math.cos(r), y: face.cy + face.ry * Math.sin(r), ox: Math.random()*2-1, oy: Math.random()*2-1 });
+  });
+  // Eyes, nose, mouth
+  face.leftEye = { x: face.cx - 20, y: face.cy - 15 };
+  face.rightEye = { x: face.cx + 20, y: face.cy - 15 };
+  face.nose = { x: face.cx, y: face.cy + 5 };
+  face.mouth = [
+    { x: face.cx - 18, y: face.cy + 28 },
+    { x: face.cx, y: face.cy + 34 },
+    { x: face.cx + 18, y: face.cy + 28 },
+  ];
+}
+buildFacePts();
+
+let t = 0;
+function drawFace() {
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  // Dark bg
+  ctx.fillStyle = '#05050a';
+  ctx.fillRect(0, 0, w, h);
+
+  // Scanlines
+  for (let y = 0; y < h; y += 4) {
+    ctx.fillStyle = 'rgba(255,255,255,0.012)';
+    ctx.fillRect(0, y, w, 1);
+  }
+
+  const mood = currentMood ? MOODS[currentMood] : null;
+  let moodColor = '#1DB954';
+  if (currentMood === 'stressed') moodColor = '#ff6b6b';
+  else if (currentMood === 'sad') moodColor = '#b47aff';
+  else if (currentMood === 'focused') moodColor = '#4a9eff';
+  else if (currentMood === 'happy') moodColor = '#1DB954';
+
+  t += 0.02;
+  const breathe = Math.sin(t) * 3;
+  const cx = face.cx + Math.sin(t * 0.3) * 4;
+  const cy = face.cy + Math.cos(t * 0.2) * 2;
+
+  // Bounding box
+  const boxX = cx - 80, boxY = cy - 100, boxW = 160, boxH = 145;
+  ctx.strokeStyle = moodColor;
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.6;
+  const cr = 8;
+  // corners only
+  const cornerLen = 18;
+  [
+    [boxX, boxY, 1, 1], [boxX + boxW, boxY, -1, 1],
+    [boxX, boxY + boxH, 1, -1], [boxX + boxW, boxY + boxH, -1, -1]
+  ].forEach(([x, y, dx, dy]) => {
+    ctx.beginPath();
+    ctx.moveTo(x + dx * cornerLen, y);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x, y + dy * cornerLen);
+    ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+
+  // Face outline
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + breathe * 0.3, face.rx + breathe * 0.3, face.ry + breathe * 0.5, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = `${moodColor}55`;
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  // Landmark points
+  face.pts.forEach((p, i) => {
+    const px = cx + (face.rx + breathe * 0.3) * Math.cos(i * 30 * Math.PI / 180);
+    const py = cy + breathe * 0.3 + (face.ry + breathe * 0.5) * Math.sin(i * 30 * Math.PI / 180);
+    ctx.beginPath();
+    ctx.arc(px + Math.sin(t + i) * 0.5, py + Math.cos(t * 0.7 + i) * 0.5, 2, 0, Math.PI * 2);
+    ctx.fillStyle = moodColor;
+    ctx.globalAlpha = 0.7;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  });
+
+  // Eyes
+  [-1, 1].forEach(side => {
+    const ex = cx + side * 22;
+    const ey = cy - 15 + breathe * 0.2;
+    // Eye socket
+    ctx.beginPath();
+    ctx.ellipse(ex, ey, 8, 5.5, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = `${moodColor}88`;
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    // Iris
+    ctx.beginPath();
+    ctx.arc(ex, ey, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = moodColor;
+    ctx.globalAlpha = 0.5;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    // Pupil
+    ctx.beginPath();
+    ctx.arc(ex, ey, 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.globalAlpha = 0.8;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  });
+
+  // Nose
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 8 + breathe * 0.1);
+  ctx.lineTo(cx - 6, cy + 8 + breathe * 0.1);
+  ctx.lineTo(cx + 6, cy + 8 + breathe * 0.1);
+  ctx.strokeStyle = `${moodColor}44`;
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  // Mouth — changes with mood
+  const mouthY = cy + 26 + breathe * 0.2;
+  const mouthW = 16;
+  let mouthCurve = 0; // 0 = neutral
+  if (currentMood === 'happy') mouthCurve = 6;
+  else if (currentMood === 'sad') mouthCurve = -5;
+  else if (currentMood === 'stressed') mouthCurve = -2;
+  else if (currentMood === 'focused') mouthCurve = 1;
+
+  ctx.beginPath();
+  ctx.moveTo(cx - mouthW, mouthY);
+  ctx.quadraticCurveTo(cx, mouthY + mouthCurve, cx + mouthW, mouthY);
+  ctx.strokeStyle = `${moodColor}88`;
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Mesh lines (connecting pts)
+  for (let i = 0; i < face.pts.length; i++) {
+    const p1 = face.pts[i];
+    const p2 = face.pts[(i + 1) % face.pts.length];
+    const px1 = cx + (face.rx + breathe * 0.3) * Math.cos(i * 30 * Math.PI / 180);
+    const py1 = cy + breathe * 0.3 + (face.ry + breathe * 0.5) * Math.sin(i * 30 * Math.PI / 180);
+    const px2 = cx + (face.rx + breathe * 0.3) * Math.cos((i + 1) * 30 * Math.PI / 180);
+    const py2 = cy + breathe * 0.3 + (face.ry + breathe * 0.5) * Math.sin((i + 1) * 30 * Math.PI / 180);
+    ctx.beginPath();
+    ctx.moveTo(px1, py1);
+    ctx.lineTo(px2, py2);
+    ctx.strokeStyle = `${moodColor}22`;
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+
+  // Label above bbox
+  ctx.font = '9px DM Mono, monospace';
+  ctx.fillStyle = moodColor;
+  ctx.globalAlpha = 0.9;
+  const label = currentMood ? currentMood.toUpperCase() : 'DETECTING';
+  ctx.fillText(label, boxX + 2, boxY - 5);
+  ctx.globalAlpha = 1;
+
+  // Confidence value
+  const conf = mood ? mood.conf : 71;
+  ctx.font = '9px DM Mono, monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fillText(`${conf}%`, boxX + boxW - 24, boxY - 5);
+
+  frameCount++;
+  if (frameCount % 90 === 0) {
+    document.getElementById('statFrames').textContent = frameCount > 999 ? (frameCount/1000).toFixed(1) + 'k' : frameCount;
+    document.getElementById('statLatency').textContent = (15 + Math.random() * 8).toFixed(0) + 'ms';
+  }
+
+  animFrame = requestAnimationFrame(drawFace);
+}
+
+drawFace();
+
+// Emotion Bars
+function renderEmotionBars(mood) {
+  const container = document.getElementById('emotionBars');
+  const data = mood ? MOODS[mood].emotions : { neutral: 45, happy: 20, focused: 20, stressed: 15 };
+  const colors = { happy: '#1DB954', focused: '#4a9eff', stressed: '#ff6b6b', sad: '#b47aff', neutral: '#888896' };
+  container.innerHTML = Object.entries(data).map(([k, v]) =>
+    `<div class="emotion-row">
+      <div class="emotion-label">${k}</div>
+      <div class="emotion-track"><div class="emotion-fill" style="width:${v}%;background:${colors[k]||'#888'};"></div></div>
+      <div class="emotion-pct">${v}%</div>
+    </div>`
+  ).join('');
+}
+renderEmotionBars(null);
+
+// Queue
+function renderQueue(mood) {
+  const tracks = mood ? MOODS[mood].tracks : [];
+  const list = document.getElementById('queueList');
+  if (!tracks.length) {
+    list.innerHTML = '<div style="font-family:DM Mono,monospace;font-size:10px;color:var(--dim);padding:8px 0;">Select a mood to load queue...</div>';
+    return;
+  }
+  list.innerHTML = tracks.slice(1).map((t, i) =>
+    `<div class="queue-item">
+      <div class="queue-num">${i + 2}</div>
+      <div class="queue-art" style="background:var(--bg)">${t.art}</div>
+      <div class="queue-info">
+        <div class="queue-name">${t.name}</div>
+        <div class="queue-artist">${t.artist}</div>
+      </div>
+      <div class="queue-bpm">${t.bpm} bpm</div>
+    </div>`
+  ).join('');
+}
+renderQueue(null);
+
+// Pipeline animation
+function animatePipeline(step) {
+  for (let i = 0; i < 5; i++) {
+    document.getElementById(`pipe${i}`).classList.toggle('active', i <= step);
+  }
+  for (let i = 0; i < 4; i++) {
+    document.getElementById(`arr${i}`).classList.toggle('active', i < step);
+  }
+}
+
+function runPipelineSequence() {
+  let s = 0;
+  const iv = setInterval(() => {
+    animatePipeline(s);
+    s++;
+    if (s > 4) clearInterval(iv);
+  }, 400);
+}
+
+// Set Mood
+function setMood(mood) {
+  // Clear any existing delay
+  if (delayInterval) clearInterval(delayInterval);
+  delayProgress = 0;
+  document.getElementById('delayFill').style.width = '0%';
+  document.getElementById('delayFill').style.background = 'var(--amber)';
+  document.getElementById('delayStatus').textContent = `Confirming ${MOODS[mood].name.toLowerCase()} mood...`;
+  document.getElementById('delayTime').textContent = '0s / 30s';
+
+  // Update demo btn states
+  document.querySelectorAll('.demo-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`[data-mood="${mood}"]`).classList.add('active');
+
+  // Update emotion bars immediately
+  renderEmotionBars(mood);
+
+  // Update canvas color + mood card
+  const m = MOODS[mood];
+  currentMood = mood;
+
+  document.getElementById('moodIcon').textContent = m.icon;
+  document.getElementById('moodName').textContent = m.name;
+  document.getElementById('moodName').style.color = m.color;
+  document.getElementById('moodDesc').textContent = m.desc;
+  document.getElementById('moodCard').style.borderColor = m.color.replace('var(--', '').replace(')', '');
+  document.getElementById('moodCard').style.background = m.bg;
+  document.getElementById('confFill').style.background = m.color;
+  document.getElementById('confFill').style.width = m.conf + '%';
+  document.getElementById('confPct').textContent = m.conf + '%';
+  document.getElementById('statConf').textContent = m.conf + '%';
+  document.getElementById('statConf').style.color = m.color;
+  document.getElementById('moodAction').textContent = 'Confirming...';
+
+  // Simulate 30s delay (compressed to 4s for demo)
+  const DEMO_DURATION = 4000;
+  const start = Date.now();
+  delayInterval = setInterval(() => {
+    const elapsed = Date.now() - start;
+    const realSecs = Math.round((elapsed / DEMO_DURATION) * 30);
+    delayProgress = Math.min((elapsed / DEMO_DURATION) * 100, 100);
+    document.getElementById('delayFill').style.width = delayProgress + '%';
+    document.getElementById('delayTime').textContent = `${realSecs}s / 30s`;
+
+    if (delayProgress >= 100) {
+      clearInterval(delayInterval);
+      document.getElementById('delayFill').style.background = 'var(--green)';
+      document.getElementById('delayStatus').textContent = `✓ Mood confirmed — triggering Spotify action`;
+      document.getElementById('moodAction').textContent = m.action;
+
+      // Update player
+      const track = m.tracks[0];
+      document.getElementById('trackArt').textContent = track.art;
+      document.getElementById('trackArt').style.background = m.bg;
+      document.getElementById('trackName').textContent = track.name;
+      document.getElementById('trackArtist').textContent = track.artist;
+      document.getElementById('trackBpm').textContent = `${track.bpm} BPM`;
+      document.getElementById('progressFill').style.animationDuration = `${Math.max(15, 240 / track.bpm * 32)}s`;
+
+      // Render queue
+      renderQueue(mood);
+
+      // Animate pipeline
+      runPipelineSequence();
+
+      // Add log event
+      addLog(mood, track, m.action);
+
+      showToast(`${m.icon} ${m.name} confirmed — queue updated`);
+    } else if (delayProgress > 50) {
+      document.getElementById('delayStatus').textContent = `${MOODS[mood].name} mood holding... almost there`;
+    }
+  }, 100);
+}
+
+function addLog(mood, track, action) {
+  const m = MOODS[mood];
+  logEvents.unshift({ mood, track, action, time: new Date().toLocaleTimeString('en', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) });
+  if (logEvents.length > 8) logEvents.pop();
+  const log = document.getElementById('eventLog');
+  log.innerHTML = logEvents.map(e => `
+    <div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;align-items:center;gap:10px;">
+      <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--dim);flex-shrink:0;">${e.time}</span>
+      <span style="font-size:12px;">${MOODS[e.mood].icon}</span>
+      <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);flex:1;">${e.action}</span>
+    </div>
+  `).join('');
+  document.getElementById('logCount').textContent = `${logEvents.length} event${logEvents.length !== 1 ? 's' : ''}`;
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2800);
+}
+
+let isPlayingState = false;
+function togglePlay() {
+  isPlayingState = !isPlayingState;
+  const icon = document.getElementById('playIcon');
+  if (isPlayingState) {
+    icon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+    document.getElementById('progressFill').style.animationPlayState = 'running';
+  } else {
+    icon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+    document.getElementById('progressFill').style.animationPlayState = 'paused';
+  }
+}
+
+// Initialize
+animatePipeline(0);
+renderQueue(null);
+
+// Auto-start focused after a moment
+setTimeout(() => setMood('focused'), 1200);
+</script>
+</body>
+</html>
